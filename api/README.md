@@ -7,29 +7,33 @@ This project demonstrates how to integrate with the **ChainPal API** to accept p
 A modern, responsive e-commerce interface built with **React** and **Vite**. It showcases the end-to-end flow of selecting a product, entering customer details, and initiating a crypto payment via ChainPal.
 
 ### Key Features
-*   **Product Catalog:** Displays items with different currencies (USD, NGN) and settlement types.
-*   **Settlement Logic:** Demonstrates the difference between "Collect in USD" and "Local Settlement" (converting local currency to stablecoins).
-*   **Checkout UI:** A clean modal interface for capturing customer information (Name, Email, Memo).
-*   **API Integration:** Direct implementation of the `/payments` endpoint using `axios`.
-*   **Error Handling:** Manages API responses, loading states, and error feedback.
+
+- **Product Catalog:** Displays items with different currencies (USD, NGN) and settlement types.
+- **Settlement Logic:** Demonstrates the difference between "Collect in USD" and "Local Settlement" (converting local currency to stablecoins).
+- **Checkout UI:** A clean modal interface for capturing customer information (Name, Email, Memo).
+- **API Integration:** Direct implementation of the `/payments` endpoint using `axios`.
+- **Error Handling:** Manages API responses, loading states, and error feedback.
 
 ### Project Structure
-*   **`src/App.jsx`**: The core logic. Contains the state management for the shopping cart and the `handlePayment` function that calls the ChainPal API.
-*   **`src/config.js`**: Centralized configuration for API keys and base URLs.
-*   **`src/products.js`**: Mock data file defining products with their prices, currencies, and settlement preferences.
-*   **`hash_test.go`**: A Go utility script for generating SHA-256 hashes of API keys (useful for backend verification or debugging).
+
+- **`src/App.jsx`**: The core logic. Contains the state management for the shopping cart and the `handlePayment` function that calls the ChainPal API.
+- **`src/config.js`**: Centralized configuration for API keys and base URLs.
+- **`src/products.js`**: Mock data file defining products with their prices, currencies, and settlement preferences.
+- **`hash_test.go`**: A Go utility script for generating SHA-256 hashes of API keys (useful for backend verification or debugging).
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-*   [Node.js](https://nodejs.org/) (v16+ recommended)
-*   A ChainPal Public Key
+
+- [Node.js](https://nodejs.org/) (v16+ recommended)
+- A ChainPal Public Key
 
 ### Installation
 
 1.  **Install dependencies:**
+
     ```bash
     npm install
     # or if using bun
@@ -42,12 +46,13 @@ A modern, responsive e-commerce interface built with **React** and **Vite**. It 
     ```properties
     VITE_API_ENV=test
     VITE_PUBLIC_KEY=cp_pk_test_...  # Your ChainPal Public Key
-    VITE_API_BASE_URL=https://api.chainpal.com/v1 # Or your local/staging URL
+    VITE_API_BASE_URL=https://api.chainpal.org/v1 # Or your local/staging URL
     ```
 
-    *Defaults:*
-    *   Base URL: `http://localhost:8080/api/v1`
-    *   Environment: `test`
+    _Defaults:_
+
+    - Base URL: `http://localhost:8080/api/v1`
+    - Environment: `test`
 
 3.  **Run the application:**
     ```bash
@@ -69,8 +74,8 @@ const payload = {
   customerEmail: formData.email,
   customerFirstName: formData.name.split(" ")[0],
   customerLastName: formData.name.split(" ").slice(1).join(" "),
-  
-  // Determines if the payment should be settled in USD (Stablecoin) 
+
+  // Determines if the payment should be collected in USD (Stablecoin)
   // or kept in the native currency logic if applicable.
   collectInUSD: selectedProduct.collectInUSD,
 
@@ -85,16 +90,12 @@ const payload = {
 };
 
 // Send Request
-const response = await axios.post(
-  `${config.apiBaseUrl}/payments`,
-  payload,
-  {
-    headers: {
-      Authorization: `Bearer ${config.publicKey}`,
-      "Content-Type": "application/json",
-    },
-  }
-);
+const response = await axios.post(`${config.apiBaseUrl}/payments`, payload, {
+  headers: {
+    Authorization: `Bearer ${config.publicKey}`,
+    "Content-Type": "application/json",
+  },
+});
 ```
 
 ### Response Handling
@@ -111,13 +112,3 @@ if (response.data.success) {
 ```
 
 ---
-
-## 🛠️ Utility Scripts
-
-### `hash_test.go`
-This Go program is included to demonstrate how to hash API keys using SHA-256. This is often required for verifying webhooks or backend-to-backend signatures.
-
-**Usage:**
-```bash
-go run hash_test.go
-```
