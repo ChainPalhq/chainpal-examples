@@ -59,7 +59,7 @@ export const products = [
   {
     id: 7,
     name: "Mechanical Keyboard",
-    price: 120000.00,
+    price: 1500.00,
     currency: "NGN",
     collectInUSD: false,
     image: "https://images.unsplash.com/photo-1587829741301-30c006095431?q=80&w=600&auto=format&fit=crop",
