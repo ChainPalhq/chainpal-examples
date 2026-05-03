@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { config } from "./config";
+import { config, validateConfig } from "./config";
 import Storefront from "./views/Storefront";
 import Quote from "./views/Quote";
 import Verify from "./views/Verify";
@@ -69,6 +69,8 @@ function App() {
     public: !!config.publicKey,
     secret: !!config.secretKey,
   };
+  // Re-validate every render — cheap, and `configVersion` already forces it.
+  const configIssues = validateConfig(config);
 
   return (
     <div
@@ -90,9 +92,16 @@ function App() {
             <KeyStatus keysReady={keysReady} />
             <button
               onClick={() => setSettingsOpen(true)}
-              className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg font-semibold"
+              className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors ${
+                configIssues.length > 0
+                  ? "bg-red-500/10 border border-red-500/40 text-red-300 hover:bg-red-500/20"
+                  : "bg-slate-800 hover:bg-slate-700 border border-slate-700"
+              }`}
             >
               Settings
+              {configIssues.length > 0 && (
+                <span className="ml-1.5">({configIssues.length})</span>
+              )}
             </button>
           </div>
         </div>
@@ -119,6 +128,33 @@ function App() {
       </header>
 
       <main className="container mx-auto max-w-7xl px-6 py-8">
+        {/* Config-issue banner — env mismatched against key prefix etc. */}
+        {configIssues.length > 0 && (
+          <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/5 p-4 flex items-start gap-3">
+            <span className="text-red-400 font-bold text-lg leading-none">⚠</span>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-red-300">
+                Configuration issue
+                {configIssues.length > 1 ? "s" : ""}
+              </p>
+              <ul className="text-xs text-red-300/80 mt-1.5 space-y-1 list-disc list-inside">
+                {configIssues.map((i, idx) => (
+                  <li key={idx}>
+                    <span className="font-mono text-red-300/60">{i.field}:</span>{" "}
+                    {i.message}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="text-xs font-bold text-red-300 underline mt-2 hover:text-red-200"
+              >
+                Open Settings →
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Return-from-checkout banner */}
         {returnInfo.isReturn && !returnDismissed && (
           <div

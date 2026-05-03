@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Environment files — never commit real keys
+.env
+.env.*
+!.env.example
+
+# Build / typing artifacts
+*.tsbuildinfo
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

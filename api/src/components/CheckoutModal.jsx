@@ -1,6 +1,46 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { initializePayment } from "../api";
 import JsonView from "./JsonView";
+
+// Field-level validation that mirrors the backend's InitializePaymentDTO
+// rules so the dev sees the same errors locally that they'd get from a 400.
+//   amount            required, > 0
+//   customerEmail     required, valid email
+//   customerFirstName optional, 2-50 chars when present
+//   customerLastName  optional, 2-50 chars when present
+//   reference         optional, 8-64 alphanumeric chars when present
+function validatePayload(form, product) {
+  const errors = {};
+
+  if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    errors.email = "Enter a valid email.";
+  }
+
+  // We split full name into first/last; whichever is present must be 2-50.
+  const parts = form.name.trim().split(/\s+/).filter(Boolean);
+  const first = parts[0] || "";
+  const last = parts.slice(1).join(" ");
+  if (first && (first.length < 2 || first.length > 50)) {
+    errors.name = "First name must be 2-50 characters.";
+  } else if (last && (last.length < 2 || last.length > 50)) {
+    errors.name = "Last name must be 2-50 characters.";
+  } else if (!first) {
+    errors.name = "Name is required.";
+  }
+
+  if (form.reference) {
+    if (!/^[a-zA-Z0-9]{8,64}$/.test(form.reference)) {
+      errors.reference =
+        "Reference must be 8-64 alphanumeric characters (no spaces or symbols).";
+    }
+  }
+
+  if (!product || !(Number(product.price) > 0)) {
+    errors.amount = "Product price must be a positive number.";
+  }
+
+  return errors;
+}
 
 // Wraps the POST /payments call with a small form. After success, redirects
 // the customer to paymentURL (the hosted checkout). The redirect target,
@@ -16,9 +56,16 @@ const CheckoutModal = ({ product, onClose }) => {
   const [error, setError] = useState(null);
   const [response, setResponse] = useState(null);
 
+  const fieldErrors = useMemo(
+    () => validatePayload(form, product),
+    [form, product]
+  );
+  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const submit = async () => {
+    if (hasFieldErrors) return;
     setLoading(true);
     setError(null);
     setResponse(null);
@@ -83,23 +130,28 @@ const CheckoutModal = ({ product, onClose }) => {
             <span className="text-blue-400 font-mono">
               {product.currency} {product.price.toFixed(2)}
             </span>
-            {product.collectInUSD && (
-              <span className="ml-2 text-[10px] uppercase tracking-widest text-emerald-400">
-                USD settlement
-              </span>
-            )}
+            <span
+              className={`ml-2 text-[10px] uppercase tracking-widest ${
+                product.collectInUSD ? "text-emerald-400" : "text-violet-400"
+              }`}
+              title="How `amount` is interpreted by the API. Settlement is always to your local fiat."
+            >
+              {product.collectInUSD
+                ? "amount = USD"
+                : "amount = local currency"}
+            </span>
           </p>
         </div>
 
         <div className="p-6 space-y-4">
-          <Field label="Full Name">
+          <Field label="Full Name" error={fieldErrors.name}>
             <input
               value={form.name}
               onChange={set("name")}
               className="input"
             />
           </Field>
-          <Field label="Email">
+          <Field label="Email" error={fieldErrors.email}>
             <input
               type="email"
               value={form.email}
@@ -109,7 +161,8 @@ const CheckoutModal = ({ product, onClose }) => {
           </Field>
           <Field
             label="Reference (optional)"
-            hint="Your unique order ID — appears on every webhook + redirect. Auto-generated if empty."
+            hint="Your unique order ID — appears on every webhook + redirect. Auto-generated if empty. 8-64 alphanumeric chars when supplied."
+            error={fieldErrors.reference}
           >
             <input
               value={form.reference}
@@ -129,8 +182,9 @@ const CheckoutModal = ({ product, onClose }) => {
 
           <button
             onClick={submit}
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl disabled:opacity-50 transition-colors"
+            disabled={loading || hasFieldErrors}
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            title={hasFieldErrors ? "Fix the errors above first" : ""}
           >
             {loading ? "Creating payment…" : "Proceed to ChainPal Checkout"}
           </button>
@@ -140,13 +194,17 @@ const CheckoutModal = ({ product, onClose }) => {
   );
 };
 
-const Field = ({ label, hint, children }) => (
+const Field = ({ label, hint, error, children }) => (
   <div>
     <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1">
       {label}
     </label>
     {children}
-    {hint && <p className="text-[11px] text-slate-500 mt-1.5">{hint}</p>}
+    {error ? (
+      <p className="text-[11px] text-red-400 mt-1.5">{error}</p>
+    ) : (
+      hint && <p className="text-[11px] text-slate-500 mt-1.5">{hint}</p>
+    )}
   </div>
 );
 

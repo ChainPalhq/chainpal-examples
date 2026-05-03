@@ -1,16 +1,32 @@
-import { useState } from "react";
-import { config, updateConfig, clearStoredConfig } from "../config";
+import { useMemo, useState } from "react";
+import {
+  config,
+  updateConfig,
+  clearStoredConfig,
+  validateConfig,
+} from "../config";
 
 // Slide-in drawer letting devs paste their public/secret keys + base URL
 // without restarting Vite. Values are persisted to localStorage.
 const SettingsDrawer = ({ open, onClose, onSaved }) => {
   const [draft, setDraft] = useState({ ...config });
 
+  // Live validation against the draft (not yet saved) — gives instant
+  // feedback as the dev pastes keys.
+  const issues = useMemo(() => validateConfig(draft), [draft]);
+  const issueByField = useMemo(() => {
+    const m = {};
+    for (const i of issues) m[i.field] = i;
+    return m;
+  }, [issues]);
+  const hasErrors = issues.length > 0;
+
   if (!open) return null;
 
   const set = (k) => (e) => setDraft((d) => ({ ...d, [k]: e.target.value }));
 
   const save = () => {
+    if (hasErrors) return;
     updateConfig(draft);
     onSaved?.();
     onClose();
@@ -66,11 +82,12 @@ const SettingsDrawer = ({ open, onClose, onSaved }) => {
           <Field
             label="Public Key"
             hint="cp_pk_test_… or cp_pk_live_… — required for create + quote"
+            issue={issueByField.publicKey}
           >
             <input
               value={draft.publicKey}
               onChange={set("publicKey")}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
+              className={inputClass(issueByField.publicKey)}
               placeholder="cp_pk_test_..."
             />
           </Field>
@@ -78,12 +95,13 @@ const SettingsDrawer = ({ open, onClose, onSaved }) => {
           <Field
             label="Secret Key"
             hint="cp_sk_test_… or cp_sk_live_… — required for verify + list"
+            issue={issueByField.secretKey}
           >
             <input
               type="password"
               value={draft.secretKey}
               onChange={set("secretKey")}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
+              className={inputClass(issueByField.secretKey)}
               placeholder="cp_sk_test_..."
             />
           </Field>
@@ -99,9 +117,11 @@ const SettingsDrawer = ({ open, onClose, onSaved }) => {
           <div className="flex gap-2 pt-2">
             <button
               onClick={save}
-              className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-lg transition-colors"
+              disabled={hasErrors}
+              className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title={hasErrors ? "Fix the validation issues above first" : ""}
             >
-              Save
+              {hasErrors ? `Fix ${issues.length} issue${issues.length > 1 ? "s" : ""} to save` : "Save"}
             </button>
             <button
               onClick={reset}
@@ -116,13 +136,24 @@ const SettingsDrawer = ({ open, onClose, onSaved }) => {
   );
 };
 
-const Field = ({ label, hint, children }) => (
+const inputClass = (issue) =>
+  `w-full bg-slate-800 border rounded-lg px-3 py-2 text-sm font-mono transition-colors ${
+    issue
+      ? "border-red-500/60 focus:border-red-400 focus:ring-1 focus:ring-red-500/40"
+      : "border-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40"
+  }`;
+
+const Field = ({ label, hint, issue, children }) => (
   <div>
     <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1">
       {label}
     </label>
     {children}
-    {hint && <p className="text-[11px] text-slate-500 mt-1.5">{hint}</p>}
+    {issue ? (
+      <p className="text-[11px] text-red-400 mt-1.5">{issue.message}</p>
+    ) : (
+      hint && <p className="text-[11px] text-slate-500 mt-1.5">{hint}</p>
+    )}
   </div>
 );
 
