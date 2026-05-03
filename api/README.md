@@ -1,114 +1,140 @@
-# ChainPal API Integration Examples
+# ChainPal API Console — Integration Demo
 
-This project demonstrates how to integrate with the **ChainPal API** to accept payments in your application. It features a complete React-based storefront example and utility scripts.
+A React + Vite playground that demonstrates **every public ChainPal Developer
+API endpoint** end-to-end. Use it to learn the surface, debug your own
+integration, or copy snippets into your codebase.
 
-## 🛍️ React Storefront Demo
+## What it covers
 
-A modern, responsive e-commerce interface built with **React** and **Vite**. It showcases the end-to-end flow of selecting a product, entering customer details, and initiating a crypto payment via ChainPal.
+| Tab           | Endpoint                                      | Auth          |
+| :------------ | :-------------------------------------------- | :------------ |
+| Storefront    | `POST /payments`                              | Public key    |
+| Quote         | `POST /payments/quote`                        | Public key    |
+| Verify        | `GET /payments/:id/verify`                    | Secret key    |
+|               | `GET /payments/reference/:reference/verify`   | Secret key    |
+|               | `GET /payments/:id` (full detail)             | Secret key    |
+| Payments      | `GET /payments` (paginated list)              | Secret key    |
 
-### Key Features
+The app also closes the loop: when the hosted checkout redirects the customer
+back, it parses `?paymentId=&reference=` from the URL, surfaces a banner, and
+auto-jumps to the **Verify** tab pre-filled with the returned ID — so you can
+watch a single transaction go through `create → checkout → verify` in one
+session.
 
-- **Product Catalog:** Displays items with different currencies (USD, NGN) and settlement types.
-- **Settlement Logic:** Demonstrates the difference between "Collect in USD" and "Local Settlement" (converting local currency to stablecoins).
-- **Checkout UI:** A clean modal interface for capturing customer information (Name, Email, Memo).
-- **API Integration:** Direct implementation of the `/payments` endpoint using `axios`.
-- **Error Handling:** Manages API responses, loading states, and error feedback.
+## Features
 
-### Project Structure
+- **Tabbed console** — one screen per API concept; each tab shows request
+  inputs, response, and a raw-JSON viewer so it doubles as a request inspector.
+- **Settings drawer** — paste your public/secret keys and base URL at runtime
+  (persisted to `localStorage`); no Vite restart, no `.env` file required for
+  quick experiments.
+- **Return-from-checkout handling** — auto-detects the redirect query params
+  appended by ChainPal and offers a one-click "Verify this payment" CTA.
+- **Quote explorer** — pick token + network + amount, see the rate and the
+  expected crypto amount before locking in a payment.
+- **Paginated list** — uses the real
+  `{ data, currentPage, totalPages, hasNext, hasPrev }` response shape with
+  working Prev / Next; status filter chips; click any row to verify it.
+- **Settlement modes** — products mix `collectInUSD: true` and `false` so you
+  can see both flows.
 
-- **`src/App.jsx`**: The core logic. Contains the state management for the shopping cart and the `handlePayment` function that calls the ChainPal API.
-- **`src/config.js`**: Centralized configuration for API keys and base URLs.
-- **`src/products.js`**: Mock data file defining products with their prices, currencies, and settlement preferences.
-- **`hash_test.go`**: A Go utility script for generating SHA-256 hashes of API keys (useful for backend verification or debugging).
-
----
-
-## 🚀 Getting Started
+## Run it
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v16+ recommended)
-- A ChainPal Public Key
+- Node.js 18+ (or [Bun](https://bun.sh/))
+- A ChainPal **public key** (`cp_pk_test_…`) for the Storefront / Quote tabs
+- A ChainPal **secret key** (`cp_sk_test_…`) for the Verify / Payments tabs
 
-### Installation
+### Install + start
 
-1.  **Install dependencies:**
+```bash
+bun install      # or: npm install
+bun run dev      # or: npm run dev
+```
 
-    ```bash
-    npm install
-    # or if using bun
-    bun install
-    ```
+Open the URL Vite prints (usually <http://localhost:5173>) and click
+**Settings** in the top right to paste your keys. They're persisted to
+`localStorage`.
 
-2.  **Configuration:**
-    The application uses `src/config.js` to manage settings. You can override defaults using a `.env` file in the `api` root directory:
+### Optional `.env`
 
-    ```properties
-    VITE_API_ENV=test
-    VITE_PUBLIC_KEY=cp_pk_test_...  # Your ChainPal Public Key
-    VITE_API_BASE_URL=https://api.chainpal.org/v1 # Or your local/staging URL
-    ```
+Pre-seed the keys instead of pasting them each time:
 
-    _Defaults:_
+```properties
+VITE_API_ENV=test
+VITE_PUBLIC_KEY=cp_pk_test_...
+VITE_SECRET_KEY=cp_sk_test_...
+VITE_API_BASE_URL=https://api.chainpal.org/api/v1
+```
 
-    - Base URL: `http://localhost:8080/api/v1`
-    - Environment: `test`
+Defaults: `test` env, base URL `http://localhost:8080/api/v1`.
 
-3.  **Run the application:**
-    ```bash
-    npm run dev
-    ```
-    Open the URL displayed in your terminal (typically `http://localhost:5173`).
+## Layout
 
----
+```
+src/
+  App.jsx                        — tab shell, return-banner, key status
+  api.js                         — axios wrapper for every endpoint
+  config.js                      — env + localStorage merge, runtime mutable
+  products.js                    — sample storefront catalog
+  components/
+    CheckoutModal.jsx            — POST /payments form + redirect
+    JsonView.jsx                 — pretty JSON inspector
+    SettingsDrawer.jsx           — runtime key/baseURL editor
+  views/
+    Storefront.jsx               — product grid → checkout
+    Quote.jsx                    — POST /payments/quote
+    Verify.jsx                   — GET /payments/:id/verify (+ by reference, + detail)
+    PaymentsList.jsx             — GET /payments (paginated)
+```
 
-## 💻 Code Integration Highlights
+## ⚠️  About the secret key in the browser
 
-### Payment Request (`src/App.jsx`)
+The Verify and Payments tabs need a **secret key**. In a real integration
+those endpoints **belong on your server**, never in the browser — the secret
+key has full account privileges. This demo accepts one only so the entire
+public API can be exercised from a single page. Live secret keys also enforce
+IP whitelisting; add this origin's IP to your ChainPal dashboard before
+flipping to live.
 
-The most critical part of the integration is constructing the payload and sending the POST request. Ensure your payload types match the API requirements (e.g., `amount` as a number).
+## Integration recipe
+
+Minimal viable flow for a real merchant integration:
 
 ```javascript
-const payload = {
-  amount: Number(selectedProduct.price),
-  customerEmail: formData.email,
-  customerFirstName: formData.name.split(" ")[0],
-  customerLastName: formData.name.split(" ").slice(1).join(" "),
-
-  // Determines if the payment should be collected in USD (Stablecoin)
-  // or kept in the native currency logic if applicable.
-  collectInUSD: selectedProduct.collectInUSD,
-
-  metadata: {
-    productId: selectedProduct.id.toString(),
-    source: "chainpal_example_store",
-    memo: formData.memo,
-  },
-
-  callbackURL: "https://your-callback-url.com/webhook",
-  failureURL: window.location.href + "?failed=true",
-};
-
-// Send Request
-const response = await axios.post(`${config.apiBaseUrl}/payments`, payload, {
+// 1. SERVER — create the payment with your PUBLIC key
+const r = await fetch("https://api.chainpal.org/api/v1/payments", {
+  method: "POST",
   headers: {
-    Authorization: `Bearer ${config.publicKey}`,
+    Authorization: `Bearer ${process.env.CHAINPAL_PUBLIC_KEY}`,
     "Content-Type": "application/json",
   },
+  body: JSON.stringify({
+    amount: order.total,
+    customerEmail: order.email,
+    reference: order.id,                                 // your stable id
+    callbackURL: "https://yoursite.com/payment/success",
+    failureURL: "https://yoursite.com/payment/cancel",
+    metadata: { orderId: order.id },
+  }),
 });
+const { paymentURL } = (await r.json()).data;
+
+// 2. BROWSER — redirect the customer
+window.location.href = paymentURL;
+
+// 3. SERVER — when ChainPal redirects back to /payment/success?paymentId=...&reference=...
+//    verify with your SECRET key before fulfilling the order
+const v = await fetch(
+  `https://api.chainpal.org/api/v1/payments/${paymentId}/verify`,
+  { headers: { Authorization: `Bearer ${process.env.CHAINPAL_SECRET_KEY}` } }
+);
+const { status, paid } = (await v.json()).data;
+if (paid && status === "completed") fulfillOrder(reference);
+
+// 4. SERVER — also handle webhooks for async outcomes, signed with your
+//    webhook signing secret. See https://docs.chainpal.org/webhooks
 ```
 
-### Response Handling
-
-If successful, the API returns a `paymentURL` which you should redirect the user to:
-
-```javascript
-if (response.data.success) {
-  const { paymentURL } = response.data.data;
-  if (paymentURL) {
-    window.location.href = paymentURL;
-  }
-}
-```
-
----
+For the full reference, see the [API docs](https://docs.chainpal.org).
